@@ -37,6 +37,33 @@
 
 RCSwitch mySwitch = RCSwitch();
 
+// Init function is used multiple times in this file
+void CC1101Init() {
+  #    if defined(RF_MODULE_SCK) && defined(RF_MODULE_MOSI) && defined(RF_MODULE_MISO) && defined(RF_MODULE_CS)
+    Log.notice(F("Custom SPI configuration SCK: %d, MOSI: %d, MISO: %d, CS: %d" CR), RF_MODULE_SCK, RF_MODULE_MISO, RF_MODULE_MOSI, RF_MODULE_CS);
+    ELECHOUSE_cc1101.setSpiPin(RF_MODULE_SCK, RF_MODULE_MISO, RF_MODULE_MOSI, RF_MODULE_CS);
+  #    endif
+
+  #    if defined(RF_MODULE_GDO0) && defined(RF_MODULE_GDO2)
+    ELECHOUSE_cc1101.setGDO(RF_MODULE_GDO0, RF_MODULE_GDO2);
+    Log.notice(F("Changing RF_EMITTER_GPIO to value of RF_MODULE_GDO2: %d -> %d " CR), RF_EMITTER_GPIO, RF_MODULE_GDO2);
+    Log.notice(F("Changing RF_RECEIVER_GPIO to value of RF_MODULE_GDO2: %d -> %d " CR), RF_RECEIVER_GPIO, RF_MODULE_GDO2);
+    #define RF_EMITTER_GPIO RF_MODULE_GDO2
+    #define RF_RECEIVER_GPIO RF_MODULE_GDO2
+  #    endif
+
+  ELECHOUSE_cc1101.Init();
+  ELECHOUSE_cc1101.SetRx(receiveMhz);
+    
+    // getCC1101() returns true if the CC1101 is detected and needs to come after ELECHOUSE_cc1101.Init()
+  // More details in library https://github.com/LSatan/SmartRC-CC1101-Driver-Lib/issues/122
+  if (ELECHOUSE_cc1101.getCC1101()) {
+    Log.notice(F("C1101 spi Connection OK" CR));
+  } else {
+    Log.error(F("C1101 spi Connection Error" CR));
+  }
+}
+
 //SOME CONVERSION function from https://github.com/sui77/rc-switch/tree/master/examples/ReceiveDemo_Advanced
 static const char* bin2tristate(const char* bin) {
   static char returnValue[50];
@@ -110,15 +137,8 @@ void setupRF() {
   //RF init parameters
   Log.notice(F("RF_EMITTER_GPIO: %d " CR), RF_EMITTER_GPIO);
   Log.notice(F("RF_RECEIVER_GPIO: %d " CR), RF_RECEIVER_GPIO);
-#  ifdef ZradioCC1101 //receiving with CC1101
-  if (ELECHOUSE_cc1101.getCC1101()) {
-    Log.notice(F("C1101 spi Connection OK" CR));
-  } else {
-    Log.error(F("C1101 spi Connection Error" CR));
-  }
-
-  ELECHOUSE_cc1101.Init();
-  ELECHOUSE_cc1101.SetRx(receiveMhz);
+#  ifdef ZradioCC1101 // Init CC1101 module
+  CC1101Init();
 #  endif
 #  ifdef RF_DISABLE_TRANSMIT
   mySwitch.disableTransmit();
@@ -334,8 +354,7 @@ void enableRFReceive() {
 #  endif
 
 #  ifdef ZradioCC1101 // set Receive on and Transmitt off
-  ELECHOUSE_cc1101.Init();
-  ELECHOUSE_cc1101.SetRx(receiveMhz);
+  CC1101Init();
 #  endif
   mySwitch.disableTransmit();
   receiveInterupt = RF_RECEIVER_GPIO;
